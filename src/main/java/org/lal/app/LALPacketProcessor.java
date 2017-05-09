@@ -15,6 +15,7 @@
  */
 package org.lal.app;
 
+import com.google.common.collect.Maps;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.ReferenceCardinality;
 import org.onlab.packet.Ethernet;
@@ -25,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import org.onosproject.event.Event;
 import org.onosproject.net.ConnectPoint;
+import org.onosproject.net.DeviceId;
 import org.onosproject.net.ElementId;
 import org.onosproject.net.Host;
 import org.onosproject.net.HostId;
@@ -37,9 +39,11 @@ import org.onosproject.net.packet.PacketContext;
 import org.onosproject.net.packet.PacketProcessor;
 import org.onosproject.net.topology.TopologyService;
 
+import java.util.Map;
 import java.util.List;
 
 public class LALPacketProcessor implements PacketProcessor {
+    protected Map<DeviceId, Map<MacAddress, PortNumber>> macTables = Maps.newConcurrentMap();
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
