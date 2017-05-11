@@ -25,26 +25,38 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.onosproject.event.Event;
-import org.onosproject.net.ConnectPoint;
-import org.onosproject.net.DeviceId;
 import org.onosproject.net.ElementId;
 import org.onosproject.net.Host;
 import org.onosproject.net.HostId;
-import org.onosproject.net.PortNumber;
 import org.onosproject.net.host.HostListener;
 import org.onosproject.net.host.HostService;
 import org.onosproject.net.link.LinkEvent;
 import org.onosproject.net.packet.InboundPacket;
 import org.onosproject.net.packet.PacketContext;
-import org.onosproject.net.packet.PacketProcessor;
 import org.onosproject.net.topology.TopologyService;
-
+import org.onosproject.core.ApplicationId;
+import org.onosproject.core.CoreService;
+import org.onosproject.net.ConnectPoint;
+import org.onosproject.net.DeviceId;
+import org.onosproject.net.PortNumber;
+import org.onosproject.net.flow.DefaultFlowRule;
+import org.onosproject.net.flow.DefaultTrafficSelector;
+import org.onosproject.net.flow.DefaultTrafficTreatment;
+import org.onosproject.net.flow.FlowRule;
+import org.onosproject.net.flow.FlowRuleService;
+import org.onosproject.net.packet.PacketContext;
+import org.onosproject.net.packet.PacketPriority;
+import org.onosproject.net.packet.PacketProcessor;
+import org.onosproject.net.packet.PacketService;
 import java.util.Map;
 import java.util.List;
 
 public class LALPacketProcessor implements PacketProcessor {
     protected Map<DeviceId, Map<MacAddress, PortNumber>> macTables = Maps.newConcurrentMap();
 
+    private ApplicationId appId;
+
+    protected FlowRuleService flowRuleService;
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     protected HostService hostService;
@@ -53,13 +65,25 @@ public class LALPacketProcessor implements PacketProcessor {
 
     private LALMeasurement lal;
 
+    private int count=0;
+
     public void registerSketch(LALMeasurement sketch) {
 	this.lal = sketch;
     }
 
     @Override
     public void process(PacketContext context) {
+        Short type = context.inPacket().parsed().getEtherType();
+        if (type != Ethernet.TYPE_IPV4) {
+            return;
+        }
 
+
+	log.info(context.toString());
+	initMacTable(context.inPacket().receivedFrom());
+	System.out.println("Now begin to process packets!");
+	actLikeSwitch(context);
+/*
 	InboundPacket pkt = context.inPacket();
 	ElementId switchId = pkt.receivedFrom().elementId();
 	Ethernet ethPkt = pkt.parsed();
@@ -101,7 +125,7 @@ public class LALPacketProcessor implements PacketProcessor {
 	    int destaddr = ipv4packet.getDestinationAddress();
 	    this.lal.dealipv4(ipv4packet, switchId, srcMacAddr, destMacAddr, srcaddr, destaddr); 
 	}
-	
+*/	
     }   
     
     private void flood(PacketContext context) {
@@ -150,5 +174,88 @@ public class LALPacketProcessor implements PacketProcessor {
     public void registerTopologyservice(TopologyService top) {
 	topologyService = top;
     }
+ 
+/**
+         * Example method. Floods packet out of all switch ports.
+         *
+         * @param pc the PacketContext object passed through from activate() method
+         */
+        public void actLikeHub(PacketContext pc) {
+            pc.treatmentBuilder().setOutput(PortNumber.FLOOD);
+            pc.send();
+        }
+
+        /**
+         * Ensures packet is of required type. Obtain the PortNumber associated with the inPackets DeviceId.
+         * If this port has previously been learned (in initMacTable method) build a flow using the packet's
+         * out port, treatment, destination, and other properties.  Send the flow to the learned out port.
+         * Otherwise, flood packet to all ports if out port is not learned.
+         *
+         * @param pc the PacketContext object passed through from activate() method
+         */
+        public void actLikeSwitch(PacketContext pc) {
+	    System.out.println("In act like Switch");
+            /*
+             * Ensures the type of packet being processed is only of type IPV4 (not LLDP or BDDP).  If it is not, return
+             * and do nothing with the packet. actLikeSwitch can only process IPV4 packets.
+             */
+            Short type = pc.inPacket().parsed().getEtherType();
+            if (type != Ethernet.TYPE_IPV4) {
+                return;
+            }
+
+	    /*
+             * Learn the destination, source, and output port of the packet using a ConnectPoint and the
+             * associated macTable.  If there is a known port associated with the packet's destination MAC Address,
+             * the output port will not be null.
+             */
+            ConnectPoint cp = pc.inPacket().receivedFrom();
+            Map<MacAddress, PortNumber> macTable = macTables.get(cp.deviceId());
+            MacAddress srcMac = pc.inPacket().parsed().getSourceMAC();
+            MacAddress dstMac = pc.inPacket().parsed().getDestinationMAC();
+            macTable.put(srcMac, cp.port());
+            PortNumber outPort = macTable.get(dstMac);
+
+            /*
+             * If port is known, set pc's out port to the packet's learned output port and construct a
+             * FlowRule using a source, destination, treatment and other properties. Send the FlowRule
+             * to the designated output port.
+             */
+            if (outPort != null) {
+		count++;
+	    	System.out.println("Switch_count="+count);
+		System.out.println("Install rule:dstMac "+dstMac+" outPort "+outPort+" deviceId "+cp.deviceId());
+	        IPv4 ipv4packet = (IPv4) pc.inPacket().parsed().getPayload();
+		int srcaddr = ipv4packet.getSourceAddress();	
+	        int destaddr = ipv4packet.getDestinationAddress();
+		System.out.println("IPv4:src "+srcaddr+"destaddr "+destaddr);
+                pc.treatmentBuilder().setOutput(outPort);
+
+		FlowRule fr = DefaultFlowRule.builder()
+                        .withSelector(DefaultTrafficSelector.builder().matchEthDst(dstMac).build())
+                        .withTreatment(DefaultTrafficTreatment.builder().setOutput(outPort).build())
+                        .forDevice(cp.deviceId()).withPriority(PacketPriority.REACTIVE.priorityValue())
+                        .makeTemporary(60)
+                        .fromApp(appId).build();
+                flowRuleService.applyFlowRules(fr);
+                pc.send();
+            } else {
+            /*
+             * else, the output port has not been learned yet.  Flood the packet to all ports using
+             * the actLikeHub method
+             */
+		System.out.println("Flooding the packet!");
+                actLikeHub(pc);
+            }
+        }
+
+    /**
+         * puts the ConnectPoint's device Id into the map macTables if it has not previously been added.
+         * @param cp ConnectPoint containing the required DeviceId for the map
+         */
+        private void initMacTable(ConnectPoint cp) {
+            macTables.putIfAbsent(cp.deviceId(), Maps.newConcurrentMap());
+
+        }
 
 }

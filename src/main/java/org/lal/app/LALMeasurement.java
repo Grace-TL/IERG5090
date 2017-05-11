@@ -43,15 +43,15 @@ public class LALMeasurement extends Thread {
 
     public void run() {
 	System.out.println("LALMeasurement start");
-	while(this.flag) {
-	    System.out.println(count);
-	    count += 1;
-	    try {
-		Thread.sleep(5000);
-	    } catch (InterruptedException e) {
-		System.out.println("org.lal.app.LALMeasurement.run: InterruptedException");
-	    }
-	}
+//	while(this.flag) {
+	   // System.out.println(count);
+	   // count += 1;
+	   // try {
+	//	Thread.sleep(5000);
+	  //  } catch (InterruptedException e) {
+	//	System.out.println("org.lal.app.LALMeasurement.run: InterruptedException");
+	  //  }
+//	}
     }
 
     public void start() {
