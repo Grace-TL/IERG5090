@@ -81,7 +81,6 @@ public class AppComponent {
     @Activate
     protected void activate(ComponentContext context) {
         lal = new LALMeasurement();
-        lal.start();
 	processor.registerSketch(lal);
 	processor.registerHostservice(hostService);
 
@@ -109,7 +108,7 @@ public class AppComponent {
     }
     
     public String getStatistic() {
-	return Integer.toString(lal.getCount());
+	return lal.getResult();
     }
 
     private void requestIntercepts() {

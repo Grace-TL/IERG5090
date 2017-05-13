@@ -88,7 +88,6 @@ public class LALPacketProcessor implements PacketProcessor {
 
     @Override
     public void process(PacketContext context) {
-	
 	// unpack context
 	InboundPacket pkt = context.inPacket();
 	
@@ -139,9 +138,11 @@ public class LALPacketProcessor implements PacketProcessor {
 	    System.out.println("we need to measure this packet");
 	    IPv4 ipv4packet = (IPv4) ethPkt.getPayload();
 	    Header lalheader = createHeader(ipv4packet);
-	    short totallength = ipv4packet.getTotalLength();
+	    int totallength = (int)ipv4packet.getTotalLength();
 	    if (lalheader != null) {
 		// do measure use lalheader and totallength
+		//lal.test(lalheader, totallength);
+		lal.topk(lalheader, totallength);
 	    }
 	}
     }

@@ -1,16 +1,16 @@
 package org.lal.app;
 import java.io.Serializable;
-
-public class Header implements Serializable{
-    public static int srcIp;
+import java.lang.CloneNotSupportedException;
+public class Header implements Serializable, Cloneable{
+    private int srcIp;
  
-    public static int dstIp;
+    private int dstIp;
 
-    public static short srcPort;
+    private short srcPort;
 
-    public static short dstPort;
+    private short dstPort;
 
-    public static byte protocol;
+    private byte protocol;
     
     Header(int sip, int dip, short sport, short dport, byte pro){
 
@@ -24,6 +24,25 @@ public class Header implements Serializable{
     Header(){
     }
 
+    public Object clone(){
+	Header header = null;
+	try{
+	    header = (Header)super.clone();
+	    header.srcIp = this.srcIp;
+	}catch(CloneNotSupportedException e){
+	    e.printStackTrace();
+	}
+	return header;
+    }
+/*
+    public Header(Header another){
+	this.srcIp = another.getSrcIp();
+	this.dstIp = another.getDstIp();
+	this.srcPort = another.getSrcPort();
+	this.dstPort = another.getDstPort();
+	this.protocol = another.getProtocol();
+    } 
+*/
     public void setSrcIp(int sourceip) {
 	this.srcIp = sourceip;
     }
@@ -43,6 +62,47 @@ public class Header implements Serializable{
     public void setProtocol(byte prot) {
 	this.protocol = prot;
     }
+
+
+    public int getSrcIp( ) {
+	return this.srcIp;
+    }
+
+    public int getDstIp( ) {
+	return this.dstIp;
+    }
+
+    public short getSrcPort( ) {
+	return this.srcPort;
+    }
+
+    public short getDstPort( ) {
+	return this.dstPort;
+    }
+
+    public byte getProtocol( ) {
+	return this.protocol;
+    }
+
+    public boolean sameHeader(Header header){
+	this.dump();
+	header.dump();
+/*
+	if(this.srcIp == header.getSrcIp())
+	    if(this.dstIp == header.getDstIp())
+		if(this.srcPort == header.getSrcPort())
+		    if(this.dstPort == header.getDstPort())
+			if(this.protocol == header.getProtocol())
+			    return true;
+	return false;
+*/
+	return this.srcIp == header.getSrcIp() &&
+	       this.dstIp == header.getDstIp() &&
+	       this.srcPort == header.getSrcPort() &&
+	       this.dstPort == header.getDstPort() &&
+	       this.protocol == header.getProtocol();
+  
+  }
 
     public void dump() {
 	System.out.println("srcIp : " + srcIp
