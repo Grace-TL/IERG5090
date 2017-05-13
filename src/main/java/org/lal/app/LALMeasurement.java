@@ -42,6 +42,7 @@ public class LALMeasurement extends Thread {
     }
 
     public void run() {
+	System.out.println(" ");
 	System.out.println("LALMeasurement start");
 //	while(this.flag) {
 	   // System.out.println(count);

@@ -34,6 +34,7 @@ import org.onosproject.core.CoreService;
 import org.onosproject.event.Event;
 import org.onosproject.net.flow.DefaultTrafficSelector;
 import org.onosproject.net.flow.TrafficSelector;
+import org.onosproject.net.flowobjective.FlowObjectiveService;
 import org.onosproject.net.host.HostService;
 import org.onosproject.net.link.LinkEvent;
 import org.onosproject.net.packet.PacketPriority;
@@ -55,6 +56,9 @@ public class AppComponent {
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected CoreService coreService;
+
+    @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
+    protected FlowObjectiveService flowObjectiveService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
     protected HostService hostService;
@@ -82,9 +86,11 @@ public class AppComponent {
 	processor.registerHostservice(hostService);
 
 	appId = coreService.registerApplication("org.lal.app");
+	processor.registerAppId(appId);
 	packetService.addProcessor(processor, PacketProcessor.director(2));
 	topologyService.addListener(topologyListener);
 	processor.registerTopologyservice(topologyService);
+	processor.registerFlowObjectiveService(flowObjectiveService);
 	requestIntercepts();
 
 	log.info("Started", appId.id());
@@ -119,8 +125,8 @@ public class AppComponent {
 	TrafficSelector.Builder selector = DefaultTrafficSelector.builder();
 	selector.matchEthType(Ethernet.TYPE_IPV4);
 	packetService.cancelPackets(selector.build(), PacketPriority.REACTIVE, appId);
-//	selector.matchEthType(Ethernet.TYPE_ARP);
-//	packetService.cancelPackets(selector.build(), PacketPriority.REACTIVE, appId);
+	selector.matchEthType(Ethernet.TYPE_ARP);
+	packetService.cancelPackets(selector.build(), PacketPriority.REACTIVE, appId);
     }
 
     private class InternalTopologyListener implements TopologyListener {
