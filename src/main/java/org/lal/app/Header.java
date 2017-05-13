@@ -21,4 +21,35 @@ public class Header implements Serializable{
 	this.protocol = pro;
     }
 
+    Header(){
+    }
+
+    public void setSrcIp(int sourceip) {
+	this.srcIp = sourceip;
+    }
+
+    public void setDstIp(int destip) {
+	this.dstIp = destip;
+    }
+
+    public void setSrcPort(short sourceport) {
+	this.srcPort = sourceport;
+    }
+
+    public void setDstPort(short destport) {
+	this.dstPort = destport;
+    }
+
+    public void setProtocol(byte prot) {
+	this.protocol = prot;
+    }
+
+    public void dump() {
+	System.out.println("srcIp : " + srcIp
+		+ "; srcPort : " + srcPort
+		+ "; dstIp : " + dstIp 
+		+ "; dstPort : " + dstPort
+		+ "; protocol : " + protocol);
+    }
+
  }

@@ -18,9 +18,13 @@ package org.lal.app;
 import com.google.common.collect.Maps;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.ReferenceCardinality;
+import org.onlab.packet.BasePacket;
 import org.onlab.packet.Ethernet;
+import org.onlab.packet.IPacket;
 import org.onlab.packet.IPv4;
 import org.onlab.packet.MacAddress;
+import org.onlab.packet.TCP;
+import org.onlab.packet.UDP;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -128,9 +132,42 @@ public class LALPacketProcessor implements PacketProcessor {
 	}  
 	packetOut(context, dstport);
  	
-	
+	// now we can process this packet
+	// process packet from switch 2 and switch 3
+	if (cp.deviceId().toString().equals("of:0000000000000002") 
+		||cp.deviceId().toString().equals("of:0000000000000003")) {
+	    System.out.println("we need to measure this packet");
+	    IPv4 ipv4packet = (IPv4) ethPkt.getPayload();
+	    Header lalheader = createHeader(ipv4packet);
+	    short totallength = ipv4packet.getTotalLength();
+	    if (lalheader != null) {
+		// do measure use lalheader and totallength
+	    }
+	}
     }
 
+    private Header createHeader(IPv4 ipv4packet) {
+	Header lalheader = new Header();
+	lalheader.setSrcIp(ipv4packet.getSourceAddress());
+	lalheader.setDstIp(ipv4packet.getDestinationAddress());
+	byte protocol = ipv4packet.getProtocol();
+	lalheader.setProtocol(protocol);
+	if(protocol == IPv4.PROTOCOL_ICMP) {
+	    lalheader.setSrcPort((short)0);
+	    lalheader.setSrcPort((short)0);
+	} else if (protocol == IPv4.PROTOCOL_TCP) {
+	    TCP tcp = (TCP) ipv4packet.getPayload();
+	    lalheader.setSrcPort((short)tcp.getSourcePort());
+	    lalheader.setDstPort((short)tcp.getDestinationPort());
+	} else if (protocol == IPv4.PROTOCOL_UDP) {
+	    UDP udp = (UDP) ipv4packet.getPayload();
+	    lalheader.setSrcPort((short)udp.getSourcePort());
+	    lalheader.setDstPort((short)udp.getDestinationPort());
+	} else {
+	    return null;
+	}
+	return lalheader;
+    }
     private void installRule(PacketContext context, PortNumber portNumber) {
 	Ethernet inPkt = context.inPacket().parsed();
 
