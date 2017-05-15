@@ -34,15 +34,7 @@ public class Header implements Serializable, Cloneable{
 	}
 	return header;
     }
-/*
-    public Header(Header another){
-	this.srcIp = another.getSrcIp();
-	this.dstIp = another.getDstIp();
-	this.srcPort = another.getSrcPort();
-	this.dstPort = another.getDstPort();
-	this.protocol = another.getProtocol();
-    } 
-*/
+
     public void setSrcIp(int sourceip) {
 	this.srcIp = sourceip;
     }
@@ -85,17 +77,6 @@ public class Header implements Serializable, Cloneable{
     }
 
     public boolean sameHeader(Header header){
-	this.dump();
-	header.dump();
-/*
-	if(this.srcIp == header.getSrcIp())
-	    if(this.dstIp == header.getDstIp())
-		if(this.srcPort == header.getSrcPort())
-		    if(this.dstPort == header.getDstPort())
-			if(this.protocol == header.getProtocol())
-			    return true;
-	return false;
-*/
 	return this.srcIp == header.getSrcIp() &&
 	       this.dstIp == header.getDstIp() &&
 	       this.srcPort == header.getSrcPort() &&

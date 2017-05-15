@@ -38,17 +38,21 @@ public class LALMeasurement extends Thread {
     private final Logger log = LoggerFactory.getLogger(getClass());
     private Thread t;
     private int count;
+    private long totalCount;
     private boolean flag;  // flag == true, thread continue to run; flag == false, thread stop;
     private static CountMin cm;
     private static CountMin lc;
+    private static LCount lcm;
     private int disCount;
     private Map<Header, Integer> packetmap = new HashMap<Header, Integer>(); 
+    private Map<Header, Integer> supermap = new HashMap<Header, Integer>();
 //    private CountMin cm = new CountMin(65535, 4);
     LALMeasurement() {
 	this.count = 0;
 	this.flag = true;
 	this.cm = new CountMin(65535,4);
 	this.lc = new CountMin(5000,4);
+	this.lcm = new LCount(65536, 4, 5000);
     }
 
 
@@ -67,19 +71,42 @@ public class LALMeasurement extends Thread {
 	String result = "Top 5 heavy flows are:" + System.lineSeparator();	
 	//output heavy packet
 	MyUtil myutil = new MyUtil();
+	int i = 5;
 	Map<Header, Integer> sortedmap = myutil.sortByValue(this.packetmap);
 	for(Map.Entry<Header, Integer> entry: sortedmap.entrySet()){
-	    result = result 
-                + myutil.iptoString(entry.getKey().getSrcIp())
-		+" - "+myutil.iptoString(entry.getKey().getDstIp())
-		+" - "+entry.getKey().getSrcPort()
-		+" - "+entry.getKey().getDstPort()
-		+" - "+entry.getKey().getProtocol()
-		+" / "+entry.getValue();	
-	    result += System.lineSeparator();
+	    if(i > 0){
+	        result = result 
+                    + myutil.iptoString(entry.getKey().getSrcIp())
+		    +" - "+myutil.iptoString(entry.getKey().getDstIp())
+		    +" - "+entry.getKey().getSrcPort()
+		    +" - "+entry.getKey().getDstPort()
+		    +" - "+entry.getKey().getProtocol()
+		    +" / "+entry.getValue();	
+	        result += System.lineSeparator();
+	    }
+	    i--;
 	}
-	result += "Number of unique flow is: " + this.disCount;
 	result += "Top 5 superspreaders are:" + System.lineSeparator();	
+	i = 5;	
+	Map<Header, Integer> tmpmap = myutil.sortByValue(this.supermap);
+	for(Map.Entry<Header, Integer> entry: tmpmap.entrySet()){
+	   if(i > 0){ 
+	       result = result 
+                    + myutil.iptoString(entry.getKey().getSrcIp())
+//		    +" - "+myutil.iptoString(entry.getKey().getDstIp())
+//		    +" - "+entry.getKey().getSrcPort()
+//		    +" - "+entry.getKey().getDstPort()
+//		    +" - "+entry.getKey().getProtocol()
+		    +" / "+entry.getValue();	
+	        result += System.lineSeparator();
+	    }
+	    i--;
+	}
+	result +="Total traffic size is: " + this.totalCount
+		+ System.lineSeparator();
+	result += "Number of unique flow is: " + this.disCount
+		+ System.lineSeparator();
+
 	return result;
     }
 
@@ -103,6 +130,7 @@ public class LALMeasurement extends Thread {
 
 //top k heavy packet
     public synchronized void topk(Header headero, int val){
+	System.out.println("Detect top k heavy flows");
 	Header header = (Header)headero.clone();;
 	if(this.cm == null)
 	    return;
@@ -131,7 +159,8 @@ public class LALMeasurement extends Thread {
 		}  
 	    }
 	}
-	this.disCount = lc.linearCount();
+	disCount = lc.linearCount();
+	totalCount = cm.getCount();
 	//output heavy packet
 	Map<Header, Integer> sortedmap = new MyUtil().sortByValue(this.packetmap);
 	for(Map.Entry<Header, Integer> entry: sortedmap.entrySet())
@@ -144,7 +173,47 @@ public class LALMeasurement extends Thread {
     }
 
 //top k superspreader
-    public void superspreader(){
+    public void superspreader(Header headero, int val){
+	System.out.println("Detect top 5 superspreaders!");
+	Header header = (Header) headero.clone();
+	this.lcm.update(header, 1);
+	Header sipheader = new Header(headero.getSrcIp(),0,(short)0,(short)0,(byte)0);
+	int degree = lcm.pointEst(header);
+	System.out.println("TEST:degree=" + degree
+	+"/total:"+lcm.getCount());
+	if(degree > 0.05*lcm.getCount()){
+	    boolean flag = true;
+	    for(Map.Entry<Header, Integer> entry: this.supermap.entrySet()){
+		if(entry.getKey().sameHeader(sipheader)){
+		    flag = false;
+		    entry.setValue(degree); 
+		    break;    
+		}
+	    }
+	    if(flag){
+	    	this.supermap.put(sipheader, degree);
+	    }
+	    if(this.supermap.size()>=5){
+		for(Iterator<Map.Entry<Header, Integer>> it = this.supermap.entrySet().iterator(); it.hasNext();){
+		    Map.Entry<Header, Integer> entry = it.next();
+		    if(entry.getValue()<0.03*lcm.getCount())
+			it.remove();
+		}  
+	    }
+	}
+	//output heavy packet
+	Map<Header, Integer> sortedmap = new MyUtil().sortByValue(this.supermap);
+	int i = 5;
+	for(Map.Entry<Header, Integer> entry: sortedmap.entrySet()){
+	    if(i > 0)
+	    System.out.println(entry.getKey().getSrcIp()
+	//	+"-"+entry.getKey().getDstIp()
+	//	+"-"+entry.getKey().getSrcPort()
+	//	+"-"+entry.getKey().getDstPort()
+	//	+"-"+entry.getKey().getProtocol()
+		+" -- "+entry.getValue());	
+	    i--;
+	}
 
     }
 
@@ -153,6 +222,15 @@ public class LALMeasurement extends Thread {
 
     }
 
+    public void reset(){
+	this.cm.clear();
+	this.lc.clear();
+	this.lcm.clear();
+	System.out.println("this.packetmap length = " + this.packetmap.size());
+	this.packetmap.clear();
+	System.out.println("after reset, packetmap length = " + this.packetmap.size());
+	this.supermap.clear();
+    }
 
     public void test(Header header, int val){
 	System.out.println("[Count-Min]---------------------------");

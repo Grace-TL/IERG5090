@@ -63,6 +63,9 @@ import org.onosproject.net.packet.PacketService;
 
 import java.util.Map;
 import java.util.List;
+import java.lang.System;
+import java.util.Date;
+
 
 public class LALPacketProcessor implements PacketProcessor {
 
@@ -71,9 +74,11 @@ public class LALPacketProcessor implements PacketProcessor {
     private ApplicationId appId;
 
     protected FlowRuleService flowRuleService;
+
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     protected FlowObjectiveService flowObjectiveService;
+
     protected HostService hostService;
 
     protected TopologyService topologyService;
@@ -81,6 +86,10 @@ public class LALPacketProcessor implements PacketProcessor {
     private LALMeasurement lal;
 
     private int count=0;
+
+    private static long startTime = System.currentTimeMillis();
+
+    private long elapsedTime = 0;
 
     public void registerSketch(LALMeasurement sketch) {
 	this.lal = sketch;
@@ -105,12 +114,12 @@ public class LALPacketProcessor implements PacketProcessor {
 	if (ethPkt.getEtherType() == Ethernet.TYPE_IPV4 && id.mac().isMulticast()) return;
 	if (ethPkt.getDestinationMAC().isBroadcast()) return;
 
-	System.out.println("received from : " + cp.toString()
-		+ "; srcMAC : " + ethPkt.getSourceMAC()
-		+ "; dstMAC : " + ethPkt.getDestinationMAC());
+//	System.out.println("received from : " + cp.toString()
+//		+ "; srcMAC : " + ethPkt.getSourceMAC()
+//		+ "; dstMAC : " + ethPkt.getDestinationMAC());
 
 	count += 1;
-	System.out.println("process " + count);
+//	System.out.println("process " + count);
 	// if from switch not registered, we need to create macmap for that switch
 	initMacTable(context.inPacket().receivedFrom());
 
@@ -123,18 +132,18 @@ public class LALPacketProcessor implements PacketProcessor {
 
 	// route
 	if (dstport != PortNumber.FLOOD) {
-	    System.out.println("installRule in " + cp.toString()
-			+ "; from srcMAC " + ethPkt.getSourceMAC()
-			+ "; to dstMAC " + ethPkt.getDestinationMAC()
-			+ "; via port " + dstport);
+//	    System.out.println("installRule in " + cp.toString()
+//			+ "; from srcMAC " + ethPkt.getSourceMAC()
+//			+ "; to dstMAC " + ethPkt.getDestinationMAC()
+//			+ "; via port " + dstport);
 	    installRule(context, dstport);
 	}  
 	packetOut(context, dstport);
  	
 	// now we can process this packet
 	// process packet from switch 2 and switch 3
-	if (cp.deviceId().toString().equals("of:0000000000000002") 
-		||cp.deviceId().toString().equals("of:0000000000000003")) {
+	if (cp.deviceId().toString().equals("of:0000000000000001")){ 
+//		||cp.deviceId().toString().equals("of:0000000000000003")) {
 	    System.out.println("we need to measure this packet");
 	    IPv4 ipv4packet = (IPv4) ethPkt.getPayload();
 	    Header lalheader = createHeader(ipv4packet);
@@ -142,7 +151,18 @@ public class LALPacketProcessor implements PacketProcessor {
 	    if (lalheader != null) {
 		// do measure use lalheader and totallength
 		//lal.test(lalheader, totallength);
+		/*
+		elapsedTime = (new Date()).getTime() - startTime;
+	        System.out.println("elapseTime = " + elapsedTime);
+		if(elapsedTime > 60*1000){
+		    lal.reset();
+		    startTime = (new Date()).getTime();
+		    elapsedTime = 0;
+		    
+		}
+		*/
 		lal.topk(lalheader, totallength);
+		lal.superspreader(lalheader, totallength);
 	    }
 	}
     }
@@ -190,7 +210,6 @@ public class LALPacketProcessor implements PacketProcessor {
 //		.setOutput(portNumber)
 //		.build();
 
-//	System.out.println("22222222222222222222");
 	ForwardingObjective.Builder fbuilder = DefaultForwardingObjective.builder()
 		.withSelector(selectorBuilder.build())
 		.withTreatment(treatment)
@@ -198,12 +217,9 @@ public class LALPacketProcessor implements PacketProcessor {
 		.withFlag(ForwardingObjective.Flag.VERSATILE)
 		.fromApp(appId)
 		.makeTemporary(20);
-//	System.out.println("33333333333333333333");
 	ForwardingObjective fObjective = fbuilder.add();
-//	System.out.println("444444444444444444444");
 	flowObjectiveService.forward(context.inPacket().receivedFrom().deviceId(),
 		fObjective);
-//	System.out.println("555555555555555555555");
     }
 
     private void packetOut(PacketContext context, PortNumber portNumber) {

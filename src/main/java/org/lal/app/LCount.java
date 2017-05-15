@@ -7,15 +7,19 @@ import com.google.common.hash.Hasher;
 import java.util.Arrays;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class CountMin {
+public class LCount {
 
-    protected long count;
+    protected CountMin lc;
 
     protected int depth;
 
     protected int width;
 
-    protected int counts[][];
+    protected int lwidth;
+
+    protected int count;
+
+    protected CountMin counts[][];
 
     protected int[] min_index;
 
@@ -25,13 +29,15 @@ public class CountMin {
 
     protected int lgn = 104; 
 
-    CountMin(int width, int depth){
-	this.width = (int)(new MyUtil().getPrime(width));	
+    LCount(int width, int depth, int lc_len){
+	MyUtil myutil = new MyUtil();
+	this.width = (int)(myutil.getPrime(width));	
         this.depth = depth;
-	this.count = 0;
-	this.counts = new int[depth][width];
+	this.lwidth = lc_len;
+	this.counts = new CountMin[depth][width];
 	this.min_index = new int[depth];
 	this.num_zero = new int[depth];
+	this.lc = new CountMin((int)myutil.getPrime(lc_len),4);
 	Arrays.fill(min_index,  width);
 	Arrays.fill(num_zero,  width);
 	seed = new int[depth];
@@ -41,25 +47,31 @@ public class CountMin {
     }
 
     public synchronized void update(Header header, int val){
-	this.count += val;
+	System.out.println("Now is LCM-update!");
+	Header sipheader = new Header(header.getSrcIp(),0,(short)0,(short)0,(byte)0);
+	this.lc.update(header, 1);
 	for(int i = 0; i < this.depth; i++){
-	    int bucket = (int)(hash(header, seed[i])%this.width);
-	    if(this.counts[i][bucket] == 0)
+	    int bucket = (int)(hash(sipheader, seed[i])%this.width);
+	    if(this.counts[i][bucket] == null){
+		CountMin nlc = new CountMin((int)new MyUtil().getPrime(this.lwidth), 4);
+		this.counts[i][bucket] = nlc;
 	        this.num_zero[i]--;
+	    }
    	    if(this.min_index[i] > bucket)
 		min_index[i] = bucket;
-	    counts[i][bucket] += val;
+            Header nheader = new Header(0,header.getDstIp(),(short)0,(short)0,(byte)0);
+	    counts[i][bucket].update(nheader, val);
 	}
     }
 
     public int pointEst(Header header){
-	int bucket = (int)(hash(header, seed[0])%this.width);
-	int min = this.counts[0][bucket];
+	Header sipheader = new Header(header.getSrcIp(),0,(short)0,(short)0,(byte)0);
+	int bucket = (int)(hash(sipheader, seed[0])%this.width);
+	int min = this.counts[0][bucket].linearCount();
 	for(int i = 1; i < this.depth; i++){
-	    
-	    int bucketi  = (int)(hash(header,seed[i])%this.width);
-	    if(min > counts[i][bucketi])
-	        min = this.counts[i][bucketi];
+	    int bucketi  = (int)(hash(sipheader,seed[i])%this.width);
+	    if(min > counts[i][bucketi].linearCount())
+	        min = this.counts[i][bucketi].linearCount();
 	}
 	return min;
     }
@@ -99,14 +111,19 @@ public class CountMin {
     }
 
     public void clear(){
-	for(int[] row : this.counts)
-	    Arrays.fill(row, 0);
+	lc.clear();
+	for(CountMin[] row : this.counts)
+	    for(CountMin rcm : row)
+		rcm.clear();
 	Arrays.fill(min_index,  width);
 	Arrays.fill(num_zero,  width);
+
+
 
     }
 
     public long getCount(){
+	this.count = this.lc.linearCount();
 	return this.count;
     }	
 
